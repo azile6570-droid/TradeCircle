@@ -100,7 +100,7 @@ async function submitAuth(event) {
   errorMessage.hidden = true;
 
   try {
-const response = await fetch(`https://pretty-eagerness-production-e884.up.railway.app/api/auth/${authMode === "register" ? "register" : "login"}`, {      method: "POST",
+const response = await fetch(`https://pretty-eagerness-production-d8dd.up.railway.app/api/auth/${authMode === "register" ? "register" : "login"}`, {      method: "POST",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload)
