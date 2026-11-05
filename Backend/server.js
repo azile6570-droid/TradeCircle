@@ -9,6 +9,7 @@ const rateLimit = require("express-rate-limit");
 const path = require("path");
 
 const app = express();
+app.set("trust proxy", 1);
 
 if (!process.env.DATABASE_URL || !process.env.SESSION_SECRET) {
     throw new Error("DATABASE_URL and SESSION_SECRET must be configured.");
@@ -30,10 +31,15 @@ app.use(helmet({
     contentSecurityPolicy: false
 }));
 
-const configuredFrontendOrigins = (process.env.FRONTEND_ORIGIN || "")
-    .split(",")
-    .map((origin) => origin.trim())
-    .filter(Boolean);
+const configuredFrontendOrigins = new Set([
+    ...(process.env.FRONTEND_ORIGIN || "")
+        .split(",")
+        .map((origin) => origin.trim())
+        .filter(Boolean),
+    ...(process.env.RENDER_EXTERNAL_HOSTNAME
+        ? [`https://${process.env.RENDER_EXTERNAL_HOSTNAME}`]
+        : [])
+]);
 
 app.use((req, res, next) => {
     const origin = req.get("Origin");
@@ -50,7 +56,7 @@ app.use((req, res, next) => {
         }
     }
 
-    if (!configuredFrontendOrigins.includes(origin) && !isLocalDevelopmentOrigin) {
+    if (!configuredFrontendOrigins.has(origin) && !isLocalDevelopmentOrigin) {
         return res.status(403).json({ error: "This frontend origin is not allowed." });
     }
 

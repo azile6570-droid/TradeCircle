@@ -6,6 +6,7 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
+    "db:init": "node scripts/init-database.js",
     "migrate:sales-workspace": "node scripts/migrate-sales-workspace.js",
     "migrate:supplier-payments": "node scripts/migrate-supplier-payments.js",
     "seed-products": "node scripts/seed-products.js",

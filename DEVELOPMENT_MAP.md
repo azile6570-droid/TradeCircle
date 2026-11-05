@@ -40,4 +40,6 @@ Use this guide to find the file that owns a feature before changing it.
 
 From `TradeCircle/Backend`, run `npm.cmd start`. The app serves the frontend and API at `http://localhost:3001` unless `PORT` is set.
 
+For a new PostgreSQL database, set `DATABASE_URL` and run `npm.cmd run db:init` from `TradeCircle/Backend` before starting the app. This applies `database/schema.sql` in a transaction. The sales workspace and supplier payment migration commands below are for updating existing databases.
+
 For backend errors, check the terminal running the server. For frontend errors, check the browser developer console. Never put passwords or API secrets in this guide or source files; keep them in the backend environment file.
