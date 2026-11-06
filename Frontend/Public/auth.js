@@ -59,8 +59,6 @@ function setAuthMode(mode) {
   $("#loginModeButton").setAttribute("aria-pressed", String(!isRegistering));
   $("#authError").hidden = true;
   $("#authError").textContent = "";
-  $("#authNotice").hidden = true;
-  $("#authNotice").textContent = "";
   window.history.replaceState(null, "", `auth.html?mode=${mode}`);
 }
 
@@ -141,10 +139,7 @@ $("#togglePasswordVisibility").addEventListener("click", (event) => {
 });
 
 $("#forgotPasswordButton").addEventListener("click", () => {
-  const notice = $("#authNotice");
-  notice.textContent =
-    "Password-reset email is not configured yet. Contact the TradeCircle administrator to reset your password.";
-  notice.hidden = false;
+  window.location.assign("forgot-password.html");
 });
 
 setAuthMode(authMode);

@@ -59,7 +59,7 @@ router.get("/clients", async (req, res, next) => {
                     COALESCE(order_stats.order_count, 0)::int AS order_count,
                     COALESCE(order_stats.open_orders, 0)::int AS open_orders,
                     COALESCE(order_stats.paid_total, 0) AS paid_total,
-                    order_stats.latest_order_a
+                    order_stats.latest_order_at
              FROM users u
              LEFT JOIN LATERAL (
                  SELECT COUNT(*) AS order_count,
@@ -69,7 +69,7 @@ router.get("/clients", async (req, res, next) => {
                         COALESCE(SUM(o.total_amount) FILTER (
                             WHERE o.payment_status = 'paid'
                         ), 0) AS paid_total,
-                        MAX(o.created_at) AS latest_order_a
+                        MAX(o.created_at) AS latest_order_at
                  FROM orders o WHERE o.buyer_id = u.id
              ) order_stats ON TRUE
              WHERE u.role IN ('buyer', 'buyer_supplier') AND u.deleted_at IS NULL
@@ -92,7 +92,7 @@ router.get("/clients/:clientId", async (req, res, next) => {
     try {
         const db = req.app.locals.pool;
         const clientResult = await db.query(
-            `SELECT id, name, email, phone, business_name, created_a
+            `SELECT id, name, email, phone, business_name, created_at
              FROM users
              WHERE id = $1 AND role IN ('buyer', 'buyer_supplier') AND deleted_at IS NULL`,
             [clientId]
@@ -217,7 +217,7 @@ router.get("/rfqs", async (req, res, next) => {
                     u.name AS buyer_name, u.business_name,
                     COALESCE(json_agg(json_build_object(
                         'id', q.id, 'amount', q.amount, 'valid_until', q.valid_until,
-                        'terms', q.terms, 'status', q.status, 'created_at', q.created_a
+                        'terms', q.terms, 'status', q.status, 'created_at', q.created_at
                     ) ORDER BY q.created_at DESC) FILTER (WHERE q.id IS NOT NULL), '[]') AS quotes
              FROM sales_rfqs r
              JOIN users u ON u.id = r.buyer_id

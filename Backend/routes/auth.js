@@ -1,6 +1,7 @@
 const router = require("express").Router();
 const bcrypt = require("bcryptjs");
 const crypto = require("crypto");
+const axios = require("axios");
 const rateLimit = require("express-rate-limit");
 const { requireAuth, requireTermsAccepted } = require("../middleware/auth");
 const { CURRENT_TERMS_VERSION } = require("../config/terms");
@@ -17,6 +18,38 @@ const deleteAccountLimiter = rateLimit({
     limit: 5,
     message: { error: "Too many account deletion attempts. Please try again later." }
 });
+
+const passwordResetLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    limit: 5,
+    message: { error: "Too many password reset attempts. Please try again later." }
+});
+
+function passwordResetEmailConfig() {
+    const apiKey = process.env.RESEND_API_KEY?.trim();
+    const from = process.env.PASSWORD_RESET_EMAIL_FROM?.trim();
+    const publicAppUrl = process.env.PUBLIC_APP_URL?.trim();
+    if (!apiKey || !from || !publicAppUrl) return null;
+
+    try {
+        const url = new URL(publicAppUrl);
+        const isLocalDevelopment = ["localhost", "127.0.0.1"].includes(url.hostname);
+        if (
+            !["http:", "https:"].includes(url.protocol) ||
+            (url.protocol !== "https:" && !isLocalDevelopment) ||
+            url.username ||
+            url.password ||
+            url.search ||
+            url.hash
+        ) {
+            return null;
+        }
+    } catch {
+        return null;
+    }
+
+    return { apiKey, from, publicAppUrl: publicAppUrl.replace(/\/+$/, "") };
+}
 
 function publicUser(user) {
     return {
@@ -225,6 +258,160 @@ router.post("/login", authLimiter, async (req, res, next) => {
             });
         });
     } catch (error) {
+        next(error);
+    }
+});
+
+router.post("/forgot-password", passwordResetLimiter, async (req, res, next) => {
+    const { email } = req.body;
+    if (
+        typeof email !== "string" ||
+        email.length > 255 ||
+        !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())
+    ) {
+        return res.status(400).json({ error: "Enter a valid email address." });
+    }
+
+    const emailConfig = passwordResetEmailConfig();
+    if (!emailConfig) {
+        return res.status(503).json({
+            error: "Password reset email is not configured. Set RESEND_API_KEY, PASSWORD_RESET_EMAIL_FROM, and PUBLIC_APP_URL."
+        });
+    }
+
+    let client;
+    let tokenHash;
+    try {
+        const userResult = await req.app.locals.pool.query(
+            "SELECT id, email FROM users WHERE email = $1 AND deleted_at IS NULL",
+            [email.trim().toLowerCase()]
+        );
+        const user = userResult.rows[0];
+        if (!user) {
+            return res.status(202).json({
+                message: "If an account exists for that email, a password reset link will be sent."
+            });
+        }
+
+        const token = crypto.randomBytes(32).toString("hex");
+        tokenHash = crypto.createHash("sha256").update(token).digest("hex");
+        const resetUrl = new URL("/reset-password.html", `${emailConfig.publicAppUrl}/`);
+        resetUrl.searchParams.set("token", token);
+
+        client = await req.app.locals.pool.connect();
+        await client.query("BEGIN");
+        await client.query("DELETE FROM password_reset_tokens WHERE user_id = $1", [user.id]);
+        await client.query(
+            `INSERT INTO password_reset_tokens (user_id, token_hash, expires_at)
+             VALUES ($1, $2, NOW() + INTERVAL '30 minutes')`,
+            [user.id, tokenHash]
+        );
+        await client.query("COMMIT");
+        client.release();
+        client = null;
+
+        try {
+            await axios.post(
+                "https://api.resend.com/emails",
+                {
+                    from: emailConfig.from,
+                    to: [user.email],
+                    subject: "Reset your TradeCircle password",
+                    text: `Use this link to reset your TradeCircle password. It expires in 30 minutes:\n\n${resetUrl.toString()}\n\nIf you did not request this, you can ignore this email.`,
+                    html: `<p>Use the link below to reset your TradeCircle password. It expires in 30 minutes.</p><p><a href="${resetUrl.toString()}">Reset your password</a></p><p>If you did not request this, you can ignore this email.</p>`
+                },
+                {
+                    headers: { Authorization: `Bearer ${emailConfig.apiKey}` },
+                    timeout: 10000
+                }
+            );
+        } catch (error) {
+            await req.app.locals.pool.query(
+                "DELETE FROM password_reset_tokens WHERE token_hash = $1",
+                [tokenHash]
+            );
+            console.error(
+                "Password reset email delivery failed:",
+                error.response?.status || error.code || error.message
+            );
+            return res.status(502).json({
+                error: "Unable to send a password reset email right now. Please try again later."
+            });
+        }
+
+        res.status(202).json({
+            message: "If an account exists for that email, a password reset link will be sent."
+        });
+    } catch (error) {
+        if (client) {
+            await client.query("ROLLBACK");
+            client.release();
+        }
+        next(error);
+    }
+});
+
+router.post("/reset-password", passwordResetLimiter, async (req, res, next) => {
+    const { token, password } = req.body;
+    if (
+        typeof token !== "string" ||
+        !/^[a-f0-9]{64}$/.test(token) ||
+        typeof password !== "string" ||
+        password.length < 10 ||
+        password.length > 128
+    ) {
+        return res.status(400).json({
+            error: "Use a valid reset link and a password between 10 and 128 characters."
+        });
+    }
+
+    const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
+    let client;
+    try {
+        client = await req.app.locals.pool.connect();
+        await client.query("BEGIN");
+        const resetResult = await client.query(
+            `SELECT tokens.user_id
+             FROM password_reset_tokens AS tokens
+             JOIN users ON users.id = tokens.user_id
+             WHERE tokens.token_hash = $1
+               AND tokens.expires_at > NOW()
+               AND users.deleted_at IS NULL
+             FOR UPDATE OF tokens`,
+            [tokenHash]
+        );
+        const reset = resetResult.rows[0];
+        if (!reset) {
+            await client.query("ROLLBACK");
+            client.release();
+            return res.status(400).json({
+                error: "This password reset link is invalid or has expired. Request a new one."
+            });
+        }
+
+        const passwordHash = await bcrypt.hash(password, 12);
+        await client.query(
+            "UPDATE users SET password_hash = $1 WHERE id = $2 AND deleted_at IS NULL",
+            [passwordHash, reset.user_id]
+        );
+        await client.query(
+            "DELETE FROM password_reset_tokens WHERE user_id = $1",
+            [reset.user_id]
+        );
+        await client.query(
+            `DELETE FROM user_sessions
+             WHERE sess->'user'->>'id' = $1`,
+            [String(reset.user_id)]
+        );
+        await client.query("COMMIT");
+        client.release();
+        client = null;
+        res.json({ message: "Your password has been reset. You can now sign in." });
+    } catch (error) {
+        if (client) {
+            await client.query("ROLLBACK");
+            client.release();
+        }
         next(error);
     }
 });

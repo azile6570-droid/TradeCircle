@@ -7,11 +7,13 @@ Use this guide to find the file that owns a feature before changing it.
 - `Frontend/Public/index.html` — Page structure, forms, dashboard panels, IDs, and navigation buttons.
 - `Frontend/Public/style.css` — Layout, colors, responsive behavior, and visual states.
 - `Frontend/Public/script.js` — Browser behavior, API calls, login routing, dashboard navigation, rendering, and event handlers. New orders show each supplier's payment methods and instructions; buyers report payments and suppliers confirm receipt.
+- `Frontend/Public/forgot-password.html` and `Frontend/Public/forgot-password.js` — Request a password reset email.
+- `Frontend/Public/reset-password.html` and `Frontend/Public/reset-password.js` — Validate a reset token and set a new password.
 
 ## Backend
 
 - `Backend/server.js` — Express setup, middleware, API registration, static frontend hosting, and server startup.
-- `Backend/routes/auth.js` — Registration, sign-in, session creation, logout, and account actions.
+- `Backend/routes/auth.js` — Registration, sign-in, password reset, session creation, logout, and account actions.
 - `Backend/routes/admin.js` — Admin-only APIs for accounts, products, supplier verification, orders, payments, group deals, and activity.
 - `Backend/routes/sales.js` — Sales-employee APIs for buyer accounts, real order/payment history, private follow-ups, RFQs, and internal quote tracking.
 - `Backend/routes/products.js` — Public product listings and supplier product management.
@@ -41,5 +43,7 @@ Use this guide to find the file that owns a feature before changing it.
 From `TradeCircle/Backend`, run `npm.cmd start`. The app serves the frontend and API at `http://localhost:3001` unless `PORT` is set.
 
 For a new PostgreSQL database, set `DATABASE_URL` and run `npm.cmd run db:init` from `TradeCircle/Backend` before starting the app. This applies `database/schema.sql` in a transaction. The sales workspace and supplier payment migration commands below are for updating existing databases.
+
+Password reset uses Resend. Set `RESEND_API_KEY`, `PASSWORD_RESET_EMAIL_FROM` to a sender verified in Resend, and `PUBLIC_APP_URL` (for example `http://localhost:3001`) in `Backend/.env`. Use the production HTTPS origin for deployed environments and keep the API key private. Apply the reset-token table to an existing database with `npm.cmd run migrate:password-reset` from `TradeCircle/Backend`. Reset links are single-use and expire after 30 minutes.
 
 For backend errors, check the terminal running the server. For frontend errors, check the browser developer console. Never put passwords or API secrets in this guide or source files; keep them in the backend environment file.

@@ -2903,10 +2903,7 @@ $("#togglePasswordVisibility").addEventListener("click", (event) => {
   button.querySelector("i").className = `fas ${showPassword ? "fa-eye-slash" : "fa-eye"}`;
 });
 $("#forgotPasswordButton").addEventListener("click", () => {
-  showNotice(
-    "Password reset unavailable",
-    "Password-reset email is not configured yet. Contact the TradeCircle administrator to reset your password."
-  );
+  window.location.assign("forgot-password.html");
 });
 $("#adminQueueSearch").addEventListener("input", renderAdminOverviewQueue);
 $("#adminQueueFilter").addEventListener("change", renderAdminOverviewQueue);

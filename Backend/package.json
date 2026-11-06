@@ -9,6 +9,7 @@
     "db:init": "node scripts/init-database.js",
     "migrate:sales-workspace": "node scripts/migrate-sales-workspace.js",
     "migrate:supplier-payments": "node scripts/migrate-supplier-payments.js",
+    "migrate:password-reset": "node scripts/migrate-password-reset.js",
     "seed-products": "node scripts/seed-products.js",
     "make-admin": "node scripts/make-admin.js"
   },

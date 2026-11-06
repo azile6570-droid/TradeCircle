@@ -1016,9 +1016,9 @@ button { cursor: pointer; }
 .password-visibility-button:hover { color: #182b42; background: #f0f2f3; }
 .auth-provider-actions { display: grid; gap: 10px; }
 .auth-provider-link { justify-self: end; padding: 3px 0; border: 0; color: #906f37; background: transparent; font-size: 11px; font-weight: 700; }
-.google-signin-button { border-color: #dce1e4; color: #394753; background: #fff; }
-.google-signin-button:disabled { cursor: not-allowed; opacity: .6; }
-.auth-integration-notice { margin: 0 !important; color: #6f7a82 !important; font-size: 10px !important; text-align: center; }
+.auth-message { margin: 10px 0 14px; color: #53606a; font-size: 12px; line-height: 1.5; }
+.auth-message.auth-error { color: #a04444; }
+.reset-password-login-link { display: inline-block; margin-top: 16px; }
 .auth-terms {
   display: flex;
   align-items: flex-start;
@@ -1806,9 +1806,7 @@ select:focus-visible, textarea:focus-visible {
 .auth-page-card.is-business-registration #authForm > .auth-field,
 .auth-page-card.is-business-registration #authError,
 .auth-page-card.is-business-registration #authSubmit,
-.auth-page-card.is-business-registration #authNotice,
 .auth-page-card.is-business-registration #forgotPasswordButton { grid-column: 1 / -1; }
-.auth-page-card #authNotice { margin: 10px 0 0; }
 .auth-page-card #authSubmit:disabled { cursor: wait; opacity: .7; }
 
 @media (max-width: 640px) {
